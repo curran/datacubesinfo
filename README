@@ -1,0 +1,8 @@
+DataCubesInfo is a rough sketch of an idea for a database schema for storing data cubes, using Grails.
+
+This code is released under the GNU Lesser General Public License:
+http://www.gnu.org/licenses/lgpl.html
+
+Enjoy!
+
+-- Curran Kelleher 12/25/2010

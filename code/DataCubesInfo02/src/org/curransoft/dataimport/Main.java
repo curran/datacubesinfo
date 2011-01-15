@@ -9,7 +9,6 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.JViewport;
 import javax.swing.UIManager;
@@ -19,10 +18,12 @@ public class Main {
 	/**
 	 * The stack of modal pages.
 	 */
-	static Stack<JPanel> pageStack = new Stack<JPanel>();
+	static Stack<Page> pageStack = new Stack<Page>();
 
 	static JFrame frame;
 	static JViewport window;
+
+	static MetadataStore metadataStore = new MetadataStore();
 
 	public static void main(String[] args) {
 		// set the native system look and feel
@@ -41,96 +42,132 @@ public class Main {
 		window = new JViewport();
 
 		// initialize the window to show the front page
-		pushPage(makeFrontJPanel());
+		pushPage(makeFrontPage());
 		frame.add(window);
 		frame.setVisible(true);
 	}
 
-	public static JPanel makeFrontJPanel() {
+	@SuppressWarnings("serial")
+	public static Page makeFrontPage() {
 		// define the front page
-		JPanel frontJPanel = new JPanel();
-		frontJPanel.add(new JLabel("What would you like to do?"));
+		Page frontPage = new Page() {
+			public void passMessage(Object message) {
+				if (message instanceof Dataset){
+					metadataStore.getDatasets().add((Dataset) message);
+					
+				}
+			}
+		};
+		frontPage.add(new JLabel("What would you like to do?"));
 		JButton newDatasetButton = new JButton("Define a new data set");
 		newDatasetButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				// when the "Define a new data set" button is clicked,
 				// push a "New Data Set" page onto the modal dialog stack
-				pushPage(makeNewDataSetJPanel());
+				pushPage(makeNewDataSetPage());
 			}
 		});
 
-		frontJPanel.add(newDatasetButton);
-		frontJPanel.add(new JButton("Modify an existing data set"));
-		return frontJPanel;
+		frontPage.add(newDatasetButton);
+		frontPage.add(new JButton("Modify an existing data set"));
+		return frontPage;
 	}
 
-	private static JPanel makeNewDataSetJPanel() {
+	@SuppressWarnings("serial")
+	private static Page makeNewDataSetPage() {
 		// define the "New Dataset" page
-		JPanel newDatasetJPanel = new JPanel();
+		Page newDatasetPage = new Page() {
+			public void passMessage(Object message) {
+				if (message instanceof Dataset)
+					metadataStore.getDatasets().add((Dataset) message);
+			}
 
-		newDatasetJPanel
-				.setLayout(new BoxLayout(newDatasetJPanel, BoxLayout.Y_AXIS));
-		newDatasetJPanel.add(new JLabel("What is the title of the data set?"));
+		};
+
+		newDatasetPage
+				.setLayout(new BoxLayout(newDatasetPage, BoxLayout.Y_AXIS));
+		newDatasetPage.add(new JLabel("What is the title of the data set?"));
 		JTextField title = new JTextField();
-		newDatasetJPanel.add(title);
-		label(newDatasetJPanel, "Who created the data set?");
+		newDatasetPage.add(title);
+		label(newDatasetPage, "Who created the data set?");
 		JTextField creator = new JTextField();
-		newDatasetJPanel.add(creator);
-		newDatasetJPanel
+		newDatasetPage.add(creator);
+		newDatasetPage
 				.add(new JLabel("Who published the data set originally?"));
 		JTextField publisher = new JTextField();
-		newDatasetJPanel.add(publisher);
-		newDatasetJPanel.add(new JLabel("When was it published?"));
+		newDatasetPage.add(publisher);
+		newDatasetPage.add(new JLabel("When was it published?"));
 		JTextField publishDate = new JTextField();
-		newDatasetJPanel.add(publishDate);
+		newDatasetPage.add(publishDate);
 		JButton nextButton = new JButton("Add Tables");
 		nextButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-				pushPage(makeAddTablesJPanel());
+				pushPage(makeAddTablesPage());
 			}
 		});
-		newDatasetJPanel.add(nextButton);
+		newDatasetPage.add(nextButton);
 		JButton doneButton = new JButton("Done");
 		doneButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-				popPage();
+				popPage(null);
 			}
 		});
-		newDatasetJPanel.add(doneButton);
+		newDatasetPage.add(doneButton);
 
-		return newDatasetJPanel;
+		return newDatasetPage;
 	}
-	
-	private static JPanel makeAddTablesJPanel() {
-		// define the "New Dataset" page
-		JPanel addTableJPanel = new JPanel();
 
-		addTableJPanel
-				.setLayout(new BoxLayout(addTableJPanel, BoxLayout.Y_AXIS));
-		addTableJPanel.add(new JLabel("What?"));
-		
+	@SuppressWarnings("serial")
+	private static Page makeAddTablesPage() {
+		// define the "New Table" page
+		Page addTablePage = new Page() {
+			public void passMessage(Object message) {
+				if (message instanceof DataTable)
+					metadataStore.getDataTables().add((DataTable) message);
+			}
+		};
+
+		addTablePage.setLayout(new BoxLayout(addTablePage, BoxLayout.Y_AXIS));
+		addTablePage.add(new JLabel("What?"));
+
 		JButton doneButton = new JButton("Done");
 		doneButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
-				popPage();
+				popPage(null);
 			}
 		});
-		addTableJPanel.add(doneButton);
+		addTablePage.add(doneButton);
 
-		return addTableJPanel;
+		return addTablePage;
 	}
 
-	private static void pushPage(JPanel page) {
+	private static void pushPage(Page page) {
 		pageStack.push(page);
 		window.removeAll();
 		window.add(page);
 		frame.repaint();
 	}
 
-	private static void popPage() {
-		pageStack.pop();
+	/**
+	 * Pops the current page off the page stack. Passes the given message to
+	 * the new top page (like a function passes a return value to its caller).
+	 * 
+	 * @param message
+	 *            can be null, in which case no message is passed
+	 */
+	private static void popPage(Object message) {
+		/* Page pageWeAreLeaving = */pageStack.pop();
+		Page pageWeAreGoingTo = pageStack.peek();
+
+		if (message != null)
+			pageWeAreGoingTo.passMessage(message);
+
+		// swap the window out
 		window.removeAll();
-		window.add(pageStack.peek());
+		window.add(pageWeAreGoingTo);
+
+		// TODO swap the menu bar out
+
 		frame.repaint();
 	}
 

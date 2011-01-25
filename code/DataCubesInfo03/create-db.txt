@@ -1,0 +1,2 @@
+create database datacubes;
+grant all on datacubes.* to 'grails'@localhost identified by 'g123';

@@ -1,0 +1,24 @@
+<html> 
+<head> 
+<title>AJAX ProcessingJS Test</title> 
+<script type="text/javascript" src="js/processing.js"></script> 
+<script type="text/javascript" src="js/jquery.js"></script> 
+<script type="text/javascript"> 
+function init(){
+    $.get("Hello.pde", function(processingCode) {
+      new Processing($("#PJSCanvas")[0], processingCode);
+    });
+}
+</script> 
+</head> 
+<body onload="init();"> 
+<br>
+<br>
+<br>
+<br>
+<br>
+<center> 
+    <canvas id="PJSCanvas" width="100%" height="100%"></canvas> 
+</center> 
+</body> 
+</html> 

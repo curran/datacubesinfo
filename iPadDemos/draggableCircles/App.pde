@@ -19,16 +19,24 @@ class Circle{
     point = new Point(x,y); this.radius = radius; this.color = color;
   }
 }
-HashMap circles = new HashMap();
-HashMap circlesBeingDragged = new HashMap();
-HashMap dragStartingPoints = new HashMap();
-HashMap circleStartingPoints = new HashMap();
-double t = 0;
+class DragGesture{
+  Circle circle; //the circle being dragged
+  Point circleStart; //the initial location of the circle
+  Point dragStart; //the initial location of the touch
+  public DragGesture(Circle circle, Point circleStart, Point dragStart){
+    this.circle = circle;
+    this.circleStart = circleStart;
+    this.dragStart = dragStart;
+  }
+}
+ArrayList circles = new ArrayList();/*<Circle>*/
+HashMap pendingDragGestures = new HashMap();/*<int touchId,DragGesture>*/
+double t = 0;//"time", used for generating distinct colors
 void setup(){
   background(0);
 }
 void initCircles(){
-  int n = 12;
+  int n = 12;//put 12 circles randomly around the display
   for(int i=0;i<n;i++){
     var r = (sin(t++)/2.0+0.5)*255;
     var g = (sin(t*1.3)/2.0+0.5)*255;
@@ -36,7 +44,7 @@ void initCircles(){
     Color color = new Color(r,g,b);
     int x = random(width);
     int y = random(height);
-    circles.put(i, new Circle(x,y,60,color));
+    circles.add(new Circle(x,y,60,color));
   }
 }
 boolean firstDraw = true;
@@ -47,9 +55,8 @@ void draw(){
   }
   fill(0);
   rect(0,0,width,height);
-  Iterator it = circles.entrySet().iterator();
-  while(it.hasNext()){
-    Circle circle = it.next().getValue();
+  for(int i = 0;i<circles.size();i++){
+    Circle circle = circles.get(i);
 
     int r = circle.color.r;
     int g = circle.color.g;
@@ -64,9 +71,8 @@ void draw(){
   }
 }
 Circle getCircleUnderPoint(int x, int y){
-  Iterator it = circles.entrySet().iterator();
-  while(it.hasNext()){
-    Circle circle = it.next().getValue();
+  for(int i = circles.size()-1;i>=0;i--){
+    Circle circle = circles.get(i);
     double dx = x-circle.point.x;
     double dy = y-circle.point.y;
     double d = sqrt(dx*dx+dy*dy);
@@ -76,27 +82,28 @@ Circle getCircleUnderPoint(int x, int y){
   return null;
 }
 void touchStart(e){
-  var touch = e.changedTouches[0];
-  var touchId = touch.identifier;
-  Circle circleUnderPoint = getCircleUnderPoint(touch.pageX,touch.pageY);
-  if(circleUnderPoint != null){
-    circlesBeingDragged.put(touchId,circleUnderPoint);
-    dragStartingPoints.put(touchId,new Point(touch.pageX,touch.pageY));
-    circleStartingPoints.put(touchId,new Point(circleUnderPoint.point));
+  for(int i=0;i<e.changedTouches.length;i++){
+    var touch = e.changedTouches[i];
+    var touchId = touch.identifier;
+    Circle circleUnderPoint = getCircleUnderPoint(touch.pageX,touch.pageY);
+    if(circleUnderPoint != null){
+      Point circleStart = new Point(circleUnderPoint.point);
+      Point dragStart = new Point(touch.pageX,touch.pageY);
+      DragGesture drag = new DragGesture(circleUnderPoint,circleStart,dragStart);
+      pendingDragGestures.put(touchId,drag);
+    }
   }
 } 
 void touchMove(e){
   for(int i=0;i<e.changedTouches.length;i++){
     var touch = e.changedTouches[i];
     int touchId = touch.identifier;
-    Circle circleBeingDragged = circlesBeingDragged.get(touchId);
-    if(circleBeingDragged != null){
-      Point dragStart = dragStartingPoints.get(touchId);
-      Point circleStart = circleStartingPoints.get(touchId);
-      double dx = touch.pageX - dragStart.x;
-      double dy = touch.pageY - dragStart.y;
-      circleBeingDragged.point.x = circleStart.x + dx;
-      circleBeingDragged.point.y = circleStart.y + dy;
+    DragGesture drag = pendingDragGestures.get(touchId);
+    if(drag != null){
+      double dx = touch.pageX - drag.dragStart.x;
+      double dy = touch.pageY - drag.dragStart.y;
+      drag.circle.point.x = drag.circleStart.x + dx;
+      drag.circle.point.y = drag.circleStart.y + dy;
     }
   }
 } 
@@ -104,11 +111,8 @@ void touchEnd(e){
   for(int i=0;i<e.changedTouches.length;i++){
     var touch = e.changedTouches[i];
     int touchId = touch.identifier;
-    Circle circleBeingDragged = circlesBeingDragged.get(touchId);
-    if(circleBeingDragged != null){
-      dragStartingPoints.remove(touchId);
-      circleStartingPoints.remove(touchId);
-      circlesBeingDragged.remove(touchId);
-    }
+    DragGesture drag = pendingDragGestures.get(touchId);
+    if(drag != null)
+      pendingDragGestures.remove(touchId);
   }
 } 

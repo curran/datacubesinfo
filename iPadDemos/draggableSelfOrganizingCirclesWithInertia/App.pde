@@ -1,12 +1,3 @@
-int numCircles = 20;
-double minRadius = 5;
-double maxRadius = 100;
-double fudgeFactor = 0;
-double dampeningFactor = 0.9;
-double pullTowardCenterForce = 0.001;
-double dragPullForce = 0.2;
-double dragExtraDampening = 0.7;
-
 class Point{
   double x; double y;
   public Point(){ x = y = 0; }
@@ -48,16 +39,20 @@ class DragGesture{
 }
 ArrayList circles = new ArrayList();/*<Circle>*/
 HashMap pendingDragGestures = new HashMap();/*<int touchId,DragGesture>*/
+double t = 0;//"time", used for generating distinct colors
 void setup(){
   background(0);
 }
 void initCircles(){
-  for(int i=0;i<numCircles;i++){
-    int r = random(255); int g = random(255); int b = random(255);
+  int n = 12;//put 12 circles randomly around the display
+  for(int i=0;i<n;i++){
+    var r = (sin(t++)/2.0+0.5)*255;
+    var g = (sin(t*1.3)/2.0+0.5)*255;
+    var b = (sin(t*1.4)/2.0+0.5)*255;
     Color color = new Color(r,g,b);
-    double x = random(width); double y = random(height);
-    double radius = random(minRadius,maxRadius);
-    circles.add(new Circle(x,y,radius,color));
+    int x = random(width);
+    int y = random(height);
+    circles.add(new Circle(x,y,60,color));
   }
 }
 boolean firstDraw = true;
@@ -68,83 +63,51 @@ void draw(){
   }
   fill(0);
   rect(0,0,width,height);
-  //draw the circles
   for(int i = 0;i<circles.size();i++){
     Circle circle = circles.get(i);
-    Color color = circle.color;
-    Point point = circle.point;
+
+    int r = circle.color.r;
+    int g = circle.color.g;
+    int b = circle.color.b;
+    fill(r,g,b);
+
+    double x = circle.point.x;
+    double y = circle.point.y;
     int size = circle.radius * 2;
-    fill(color.r,color.g,color.b);
     ellipseMode(CENTER);
-    ellipse(point.x,point.y,size,size);
+    ellipse(x,y,size,size);
   }
   incrementLayout();
+  bounceOffWalls();
 }
 void incrementLayout(){
   int n = circles.size();
-  applyForces();
-  incrementVelocities();
-  dragCircles();
-  bounceOffWalls();
-  pullTowardCenter();
-}
-void applyForces(){
-  int n = circles.size();
+  //Step 1 of 3: Apply forces to all pairs
   for(int i = 0; i < n; i++){
     for(int j = i + 1; j < n; j++){
       Circle a = circles.get(i);
       Circle b = circles.get(j);
       double dx = b.point.x - a.point.x;
       double dy = b.point.y - a.point.y;
-      double d2 = dx*dx + dy*dy;
-      double cutoffD = (a.radius + b.radius)+10;
-      if(d2 < cutoffD * cutoffD){
-        double d = sqrt(d2);
-        double unitX = dx/d;
-        double unitY = dy/d;
-        double optimalD = a.radius + b.radius + n * fudgeFactor;
-        double x = d/optimalD;
-        //using sigmoid is the key to stopping incessant jitter!
-        double force = -1/(1+pow(2,((d - optimalD)*2)));
-  
-        a.velocity.x += unitX * force;
-        a.velocity.y += unitY * force;
-        b.velocity.x -= unitX * force;
-        b.velocity.y -= unitY * force;
-      }
+      double d = sqrt(dx*dx + dy*dy);
+      double unitX = dx/d;
+      double unitY = dy/d;
+      double x = d/300;
+      double force = (1/(x*x+1)) * (1/(1+pow(100,-(x-1)))-0.5);
+      a.velocity.x += unitX * force;
+      a.velocity.y += unitY * force;
+      b.velocity.x -= unitX * force;
+      b.velocity.y -= unitY * force;
     }
   }
-}
-void incrementVelocities(){
-  int n = circles.size();
+  //Step 2 of 3: Increment and dampen velocities
+  double dampeningFactor = 0.98;
   for(int i = 0; i < n; i++){
     Circle circle = circles.get(i);
     circle.point.x += (circle.velocity.x *= dampeningFactor);
     circle.point.y += (circle.velocity.y *= dampeningFactor);
   }
-}
-void bounceOffWalls(){
-  for(int i = 0; i < circles.size(); i++){
-    Circle circle = circles.get(i);
-    if(circle.point.x - circle.radius < 0){
-      circle.point.x = circle.radius;
-      circle.velocity.x = abs(circle.velocity.x);
-    }
-    else if(circle.point.x + circle.radius > width){
-      circle.point.x = width - circle.radius;
-      circle.velocity.x = -abs(circle.velocity.x);
-    }
-    if(circle.point.y - circle.radius < 0){
-      circle.point.y = circle.radius;
-      circle.velocity.y = abs(circle.velocity.y);
-    } 
-    else if(circle.point.y + circle.radius > height){
-      circle.point.y = height - circle.radius;
-      circle.velocity.y = -abs(circle.velocity.y);
-    }
-  }
-}
-void dragCircles(){
+  //Step 3 of 3: Pull circles being dragged
   Iterator it = pendingDragGestures.entrySet().iterator();
   while(it.hasNext()){
     DragGesture drag = it.next().getValue();
@@ -152,28 +115,32 @@ void dragCircles(){
     double dy = drag.previousPoint.y - drag.dragStart.y;
     double nextCircleX = drag.circleStart.x + dx;
     double nextCircleY = drag.circleStart.y + dy;
-    drag.circle.velocity.x += (nextCircleX - drag.circle.point.x)*dragPullForce;
-    drag.circle.velocity.y += (nextCircleY - drag.circle.point.y)*dragPullForce;
-    drag.circle.velocity.x *= dragExtraDampening;
-    drag.circle.velocity.y *= dragExtraDampening;
+    drag.circle.velocity.x += (nextCircleX - drag.circle.point.x)*0.2;
+    drag.circle.velocity.y += (nextCircleY - drag.circle.point.y)*0.2;
+    drag.circle.velocity.x *= 0.7;
+    drag.circle.velocity.y *= 0.7;
   }
 }
-void pullTowardCenter(){
-  int n = circles.size();
-  double centerX = width/2;
-  double centerY = height/2;
-  for(int i = 0; i < n; i++){
+void bounceOffWalls(){
+  for(int i = 0; i < circles.size(); i++){
     Circle circle = circles.get(i);
-    double dx = centerX - circle.point.x;
-    double dy = centerY - circle.point.y;
-    double d = sqrt(dx*dx + dy*dy);
-    d = d > 1 ? 1 : d;
-    double unitX = dx/d;
-    double unitY = dy/d;
-    circle.velocity.x += d * unitX * pullTowardCenterForce;
-    circle.velocity.y += d * unitY * pullTowardCenterForce;
+    if(circle.point.x < 0)
+      circle.velocity.x = abs(circle.velocity.x);
+    else if(circle.point.x > width)
+      circle.velocity.x = -abs(circle.velocity.x);
+    if(circle.point.y < 0)
+      circle.velocity.y = abs(circle.velocity.y);
+    else if(circle.point.y > height)
+      circle.velocity.y = -abs(circle.velocity.y);
   }
 }
+//boolean circleIsBeingDragged(Circle circle){
+//  Iterator it = pendingDragGestures.entrySet().iterator();
+//  while(it.hasNext())
+//    if(it.next().getValue().circle == circle)
+//      return true;
+//  return false;
+//}
 Circle getCircleUnderPoint(int x, int y){
   for(int i = circles.size()-1;i>=0;i--){
     Circle circle = circles.get(i);
